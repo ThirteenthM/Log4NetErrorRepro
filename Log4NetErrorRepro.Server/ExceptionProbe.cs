@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.Remoting.Messaging;
 using System.Text;
 using log4net;
+using Log4NetErrorRepro.Contracts;
 
 namespace Log4NetErrorRepro.Server
 {
@@ -20,8 +21,8 @@ namespace Log4NetErrorRepro.Server
             DumpField(sb, ex, "_stackTraceString");
             DumpField(sb, ex, "_remoteStackTraceString");
 
-            object ltc = CallContext.LogicalGetData("log4net.Util.LogicalThreadContextProperties");
-            sb.AppendLine("  CallContext[log4net.Util.LogicalThreadContextProperties]=" + Describe(ltc));
+            object ltc = CallContext.LogicalGetData(Log4NetCallContext.PropertiesSlotName);
+            sb.AppendLine("  CallContext[" + Log4NetCallContext.PropertiesSlotName + "]=" + Describe(ltc));
             sb.Append(DumpLogicalThreadContextProperties());
             return sb.ToString();
         }
@@ -33,7 +34,7 @@ namespace Log4NetErrorRepro.Server
         public static string DumpLogicalThreadContextProperties()
         {
             StringBuilder sb = new StringBuilder();
-            object raw = CallContext.LogicalGetData("log4net.Util.LogicalThreadContextProperties");
+            object raw = CallContext.LogicalGetData(Log4NetCallContext.PropertiesSlotName);
             if (raw == null)
             {
                 sb.AppendLine("  LTC dump: слот пуст, в CallContext нет PropertiesDictionary");

@@ -31,21 +31,15 @@ namespace Log4NetErrorRepro.Contracts
         TouchTargetSite_ReturnExceptionObject = 7,
 
         /// <summary>
-        /// LogicalThreadContext с null + log.Error, затем сериализация CallContext
-        /// при remote-ответе (та же верхушка стека: GetObjectData / GetType).
+        /// LogicalThreadContext с null + log.Error, затем CrossAppDomain
+        /// (сериализация CallContext, стек GetObjectData / GetType) и remote-ответ.
         /// </summary>
         LogError_NullLogicalThreadContext_CrossAppDomain = 8,
 
         /// <summary>
         /// Как 8, плюс обнуление всего LogicalThreadContext.Properties
-        /// (аналог Properties = null через CallContext).
+        /// (аналог Properties = null через CallContext), затем CrossAppDomain.
         /// </summary>
-        LogError_NullLogicalThreadContextProperties_CrossAppDomain = 9,
-
-        /// <summary>
-        /// long? OrderId = null на exception, поле не сериализуется в GetObjectData.
-        /// В LogicalThreadContext не кладётся — проверка, даёт ли это ошибку log4net.
-        /// </summary>
-        LogError_NullOrderIdOnException_ReturnDto = 10
+        LogError_NullLogicalThreadContextProperties_CrossAppDomain = 9
     }
 }

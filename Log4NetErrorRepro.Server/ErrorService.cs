@@ -24,10 +24,11 @@ namespace Log4NetErrorRepro.Server
 
         public RemoteResponse Execute(Scenario scenario)
         {
-            EnsureLog4Net();
-
             try
             {
+                EnsureLog4Net();
+                Log4NetCallContext.Clear();
+
                 BusinessWorker.DoWork();
                 return new RemoteResponse { Success = true, Message = "unexpected success" };
             }
@@ -115,7 +116,7 @@ namespace Log4NetErrorRepro.Server
                     log4net.LogicalThreadContext.Properties["requestId"] = "remote-demo";
                     log4net.LogicalThreadContext.Properties["user"] = null;
                     Log.Error("Текст", ex);
-                    diagnostics.AppendLine("action: LogicalThreadContext[user]=null + log.Error(\"Текст\", ex) then remoting serializes CallContext");
+                    diagnostics.AppendLine("action: LogicalThreadContext[user]=null + log.Error(\"Текст\", ex) then CrossAppDomain + remoting CallContext");
                     DumpLtcThenCrossAppDomain(diagnostics);
                     return new RemoteResponse
                     {
@@ -126,7 +127,7 @@ namespace Log4NetErrorRepro.Server
                 case Scenario.LogError_NullLogicalThreadContextProperties_CrossAppDomain:
                     log4net.LogicalThreadContext.Properties["requestId"] = "remote-demo";
                     log4net.LogicalThreadContext.Properties["user"] = null;
-                    CallContext.LogicalSetData("log4net.Util.LogicalThreadContextProperties", null);
+                    CallContext.LogicalSetData(Log4NetCallContext.PropertiesSlotName, null);
                     Log.Error("Текст", ex);
                     diagnostics.AppendLine("action: LogicalThreadContext[user]=null, Properties (CallContext)=null + log.Error then CrossAppDomain");
                     DumpLtcThenCrossAppDomain(diagnostics);
@@ -134,16 +135,6 @@ namespace Log4NetErrorRepro.Server
                     {
                         Success = false,
                         Message = ex.Message
-                    };
-
-                case Scenario.LogError_NullOrderIdOnException_ReturnDto:
-                    Log.Error("Текст", ex);
-                    diagnostics.AppendLine("action: log.Error(\"Текст\", ex), OrderId=null не в GetObjectData и не в LogicalThreadContext, return DTO with MyException");
-                    return new RemoteResponse
-                    {
-                        Success = false,
-                        Message = ex.Message,
-                        Error = ex
                     };
 
                 case Scenario.TouchTargetSite_ReturnExceptionObject:

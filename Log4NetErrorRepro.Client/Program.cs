@@ -38,9 +38,9 @@ namespace Log4NetErrorRepro.Client
 
             if (args != null && args.Length > 0)
             {
-                if( int.TryParse( args[0], out var number ) && Enum.IsDefined( typeof( Scenario ), number ) )
+                if (int.TryParse(args[0], out var number) && Enum.IsDefined(typeof(Scenario), number))
                 {
-                    RunScenario( service, (Scenario)number );
+                    RunScenario(service, (Scenario)number);
                     return 0;
                 }
 
@@ -79,9 +79,9 @@ namespace Log4NetErrorRepro.Client
                     continue;
                 }
 
-                if( int.TryParse( line, out var number ) && Enum.IsDefined( typeof( Scenario ), number ) )
+                if (int.TryParse(line, out var number) && Enum.IsDefined(typeof(Scenario), number))
                 {
-                    RunScenario( service, (Scenario)number );
+                    RunScenario(service, (Scenario)number);
                     continue;
                 }
 
@@ -103,9 +103,8 @@ namespace Log4NetErrorRepro.Client
             Console.WriteLine("  5  catch + log.Error(\"Текст\", ex) + DTO с MyException");
             Console.WriteLine("  6  LogicalThreadContext (строки) + log.Error(\"Текст\", ex) + DTO");
             Console.WriteLine("  7  прочитать ex.TargetSite + DTO с MyException (без log)");
-            Console.WriteLine("  8  LTC[user]=null + log.Error + сериализация CallContext (remote-ответ)");
+            Console.WriteLine("  8  LTC[user]=null + log.Error + CrossAppDomain (и remote-ответ)");
             Console.WriteLine("  9  LTC[user]=null, Properties=null + log.Error + CrossAppDomain");
-            Console.WriteLine("  10 long? OrderId=null на exception, без LTC, return DTO");
             Console.WriteLine("  a  прогнать все сценарии");
             Console.WriteLine("  q  выход");
             Console.WriteLine();
@@ -121,11 +120,14 @@ namespace Log4NetErrorRepro.Client
 
         private static void RunScenario(IErrorService service, Scenario scenario)
         {
-            Console.WriteLine();
-            Console.WriteLine("---------- " + (int)scenario + " " + scenario + " ----------");
             try
             {
+                Console.WriteLine();
+                Console.WriteLine("---------- " + (int)scenario + " " + scenario + " ----------");
+                Log4NetCallContext.Clear();
+
                 RemoteResponse response = service.Execute(scenario);
+
                 Console.WriteLine("Remote-ответ получен (DTO).");
                 Console.WriteLine("  Success=" + response.Success);
                 Console.WriteLine("  Message=" + response.Message);
@@ -145,6 +147,10 @@ namespace Log4NetErrorRepro.Client
             {
                 Console.WriteLine("СБОЙ СЕРИАЛИЗАЦИИ remote-ответа на клиенте:");
                 PrintExceptionChain(ex);
+            }
+            finally
+            {
+                Log4NetCallContext.Clear();
             }
         }
 
