@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Одна версия на клиенте и сервере, как на ПРОМе. -->
+    <Log4NetPackageVersion>2.0.9</Log4NetPackageVersion>
+  </PropertyGroup>
+</Project>

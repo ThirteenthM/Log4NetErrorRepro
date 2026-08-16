@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Log4NetErrorRepro.Client/Log4NetErrorRepro.Client.csproj" />
+  <Project Path="Log4NetErrorRepro.Contracts/Log4NetErrorRepro.Contracts.csproj" />
+  <Project Path="Log4NetErrorRepro.Server/Log4NetErrorRepro.Server.csproj" />
+</Solution>

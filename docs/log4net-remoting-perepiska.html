@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>log4net 2.0.9 + .NET Remoting — разбор переписки</title>
+  <style>
+    @page { size: A4; margin: 14mm 14mm 16mm 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #1a1a1a;
+      background: #f6f7f9;
+      margin: 0;
+      padding: 0;
+    }
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 8px 4px 24px;
+    }
+    h1 { font-size: 22pt; margin: 0 0 6px; color: #111; }
+    .meta { color: #5b6573; font-size: 10pt; margin-bottom: 18px; }
+    h2 {
+      font-size: 14pt;
+      margin: 22px 0 10px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #3b82f6;
+      color: #1e3a5f;
+      page-break-after: avoid;
+    }
+    h3 { font-size: 12pt; margin: 14px 0 8px; color: #243044; page-break-after: avoid; }
+    p { margin: 8px 0; }
+    ul, ol { margin: 6px 0 10px; padding-left: 22px; }
+    li { margin: 3px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10pt;
+      margin: 10px 0 14px;
+    }
+    th, td {
+      border: 1px solid #d5dbe3;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #e8eef7; }
+    tr:nth-child(even) td { background: #fafbfd; }
+    .qa {
+      margin: 0 0 14px;
+      page-break-inside: avoid;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+    }
+    .q, .a { padding: 10px 12px; }
+    .q {
+      background: #eef4ff;
+      border-bottom: 1px solid #dbe7ff;
+    }
+    .q .who { color: #2563eb; font-weight: 700; font-size: 9pt; text-transform: uppercase; letter-spacing: .04em; }
+    .a .who { color: #059669; font-weight: 700; font-size: 9pt; text-transform: uppercase; letter-spacing: .04em; }
+    .q .text, .a .text { margin-top: 4px; }
+    pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 8px;
+      padding: 10px 12px;
+      overflow: hidden;
+      font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+      font-size: 9pt;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+      page-break-inside: avoid;
+    }
+    code.inline {
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 9.5pt;
+      background: #eceff3;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    pre .kw { color: #569cd6; }
+    pre .typ { color: #4ec9b0; }
+    pre .str { color: #ce9178; }
+    pre .com { color: #6a9955; }
+    pre .num { color: #b5cea8; }
+    pre .fn { color: #dcdcaa; }
+    .callout {
+      background: #fff7e6;
+      border-left: 4px solid #f59e0b;
+      padding: 8px 12px;
+      margin: 10px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .ok {
+      background: #ecfdf3;
+      border-left: 4px solid #10b981;
+      padding: 8px 12px;
+      margin: 10px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .bad {
+      background: #fef2f2;
+      border-left: 4px solid #ef4444;
+      padding: 8px 12px;
+      margin: 10px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .stack {
+      background: #2b2118;
+      color: #f3d2b3;
+    }
+    .footer { color: #6b7280; font-size: 9pt; margin-top: 24px; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<h1>log4net 2.0.9 + .NET Remoting</h1>
+<p class="meta">
+  Разбор переписки по стенду <b>Log4NetErrorRepro</b> · .NET Framework 4.7.2 ·
+  13–16 августа 2026
+</p>
+
+<h2>Короткий вывод</h2>
+<p>
+  Ошибка «иногда» после <code class="inline">catch</code> + <code class="inline">log.Error("Текст", ex)</code>
+  возникает не из‑за разных версий log4net и не из‑за поля <code class="inline">long? OrderId</code> на exception.
+  Падает сериализация <b>CallContext</b> при формировании remote-ответа, если в
+  <code class="inline">LogicalThreadContext.Properties</code> лежит <b>null</b>.
+  В log4net 2.0.9 метод <code class="inline">ReadOnlyPropertiesDictionary.GetObjectData</code>
+  вызывает <code class="inline">value.GetType()</code> без проверки на null.
+</p>
+<div class="bad">
+  <b>Виноватый стек (верхушка):</b>
+  <code class="inline">Object.GetType()</code> →
+  <code class="inline">ReadOnlyPropertiesDictionary.GetObjectData</code> →
+  BinaryFormatter / remoting.
+  Чужой пример с SqlDependency имел ту же верхушку — к вашей задаче SqlDependency не относится.
+</div>
+
+<h2>Стенд</h2>
+<ul>
+  <li>Клиент и сервер: одна версия <b>log4net 2.0.9</b> (как на ПРОМе)</li>
+  <li>.NET Remoting TCP <code class="inline">tcp://127.0.0.1:9099/ErrorService</code></li>
+  <li>Сервер ловит <code class="inline">MyException</code> и по сценарию логирует / формирует ответ</li>
+</ul>
+<pre>dotnet run --project Log4NetErrorRepro.Server
+dotnet run --project Log4NetErrorRepro.Client</pre>
+
+<h2>Сценарии стенда</h2>
+<table>
+  <tr><th>#</th><th>Что делает</th><th>Ожидание</th></tr>
+  <tr><td>1</td><td>catch + throw, без лога</td><td>клиент получает MyException</td></tr>
+  <tr><td>2</td><td>log.Error("Текст") + throw</td><td>то же</td></tr>
+  <tr><td>3</td><td>log.Error("Текст", ex) + throw</td><td>то же</td></tr>
+  <tr><td>4</td><td>log.Error("Текст", ex) + DTO без exception</td><td>ответ приходит</td></tr>
+  <tr><td>5</td><td>log.Error("Текст", ex) + DTO с MyException</td><td>ответ приходит</td></tr>
+  <tr><td>6</td><td>LTC со <b>строками</b> + log.Error + DTO</td><td>при одинаковом log4net — OK</td></tr>
+  <tr><td>7</td><td>чтение TargetSite + DTO с exception</td><td>ответ приходит</td></tr>
+  <tr><td>8</td><td>LTC[user]=null + log.Error + сериализация CallContext</td><td><b>NRE GetType</b> — как на сервере</td></tr>
+  <tr><td>9</td><td>как 8, затем слот Properties обнуляется через CallContext</td><td>может уже не падать (обход)</td></tr>
+  <tr><td>10</td><td>long? OrderId=null только на exception, без LTC, return DTO</td><td>ответ приходит, OrderId не уезжает</td></tr>
+</table>
+
+<h2>Вопрос — ответ</h2>
+
+<div class="qa">
+  <div class="q"><div class="who">Вопрос</div>
+    <div class="text">Нужен C# стенд net 4.7.2 + log4net 2.0.9, чтобы смоделировать ошибку после
+      <code class="inline">log.Error("Текст", ex)</code> в <code class="inline">catch(MyException ex)</code>,
+      когда формируется ответ на remote-вызов.</div>
+  </div>
+  <div class="a"><div class="who">Ответ</div>
+    <div class="text">Собран раствор из трёх проектов: Contracts, Server, Client.
+      Сервер ловит MyException и по меню клиента прогоняет варианты лога и remote-ответа.</div>
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q"><div class="who">Вопрос</div>
+    <div class="text">Сценарий 6 падает: не удалось найти сборку log4net 2.0.9. На ПРОМе у клиента и сервера одна версия.</div>
+  </div>
+  <div class="a"><div class="who">Ответ</div>
+    <div class="text">Первая ошибка 6 была артефактом стенда: у клиента log4net не было.
+      На ПРОМе обе стороны с 2.0.9 — эту ошибку «assembly not found» ждать не нужно.
+      Версия закреплена в <code class="inline">Directory.Build.props</code>.</div>
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q"><div class="who">Вопрос</div>
+    <div class="text">Настоящий сервер падает с верхушкой стека как здесь (трейс чужой, SqlDependency не наш):</div>
+  </div>
+  <div class="a"><div class="who">Ответ</div>
+    <div class="text">Совпадает механизм: BinaryFormatter сериализует CallContext, в нём
+      <code class="inline">log4net.Util.PropertiesDictionary</code>.
+      В 2.0.9 GetObjectData делает GetType() на каждом value <b>до</b> проверки на null.</div>
+  </div>
+</div>
+
+<pre class="stack">Server stack trace:
+   at System.Object.GetType()
+   at log4net.Util.ReadOnlyPropertiesDictionary.GetObjectData(...)
+   at System.Runtime.Serialization.Formatters.Binary.WriteObjectInfo.InitSerialize(...)
+   at System.Runtime.Serialization.Formatters.Binary.BinaryFormatter.Serialize(...)
+   ... remoting ...</pre>
+
+<div class="qa">
+  <div class="q"><div class="who">Вопрос</div>
+    <div class="text">Можно ли написать <code class="inline">LogicalThreadContext.Properties = null</code>?</div>
+  </div>
+  <div class="a"><div class="who">Ответ</div>
+    <div class="text"><b>Нет.</b> У <code class="inline">Properties</code> только getter. Не скомпилируется.
+      Рабочие аналоги:</div>
+  </div>
+</div>
+
+<pre><span class="com">// падает при remote, если value null (сценарий 8)</span>
+log4net.LogicalThreadContext.Properties[<span class="str">"user"</span>] = <span class="kw">null</span>;
+
+<span class="com">// не компилируется</span>
+<span class="com">// log4net.LogicalThreadContext.Properties = null;</span>
+
+<span class="com">// аналоги «обнулить Properties»</span>
+log4net.LogicalThreadContext.Properties.Clear();
+CallContext.LogicalSetData(<span class="str">"log4net.Util.LogicalThreadContextProperties"</span>, <span class="kw">null</span>);</pre>
+
+<div class="qa">
+  <div class="q"><div class="who">Вопрос</div>
+    <div class="text">Может ли <code class="inline">long? OrderId = null</code> на exception без сериализации поля дать тот же стек?</div>
+  </div>
+  <div class="a"><div class="who">Ответ</div>
+    <div class="text">Само поле на exception — <b>нет</b> (сценарий 10: DTO уходит, OrderId просто не сериализуется).
+      Да — только если это null кладут в LogicalThreadContext. Разницы нет:</div>
+  </div>
+</div>
+
+<pre>Properties[<span class="str">"OrderId"</span>] = <span class="kw">null</span>;
+Properties[<span class="str">"OrderId"</span>] = ex.OrderId; <span class="com">// тоже null, это тот же сценарий 8</span></pre>
+
+<div class="qa">
+  <div class="q"><div class="who">Вопрос</div>
+    <div class="text">На ПРОМе ошибка «иногда», когда попадаем в catch.</div>
+  </div>
+  <div class="a"><div class="who">Ответ</div>
+    <div class="text">Ломается не сам catch и не log.Error. В этот момент в LTC уже бывает null
+      (user / OrderId / requestId пустые не в каждом запросе), а потом сериализуется CallContext
+      вместе с remote-ответом. Локально поля обычно заполнены — поэтому «у нас работает».</div>
+  </div>
+</div>
+
+<h2>Как выловить виноватый property на сервере</h2>
+<p>В <code class="inline">catch</code> <b>до</b> формирования remote-ответа:</p>
+<pre><span class="kw">catch</span> (MyException ex)
+{
+    log.Error(<span class="str">"Текст"</span>, ex);
+
+    <span class="kw">object</span> raw = CallContext.LogicalGetData(<span class="str">"log4net.Util.LogicalThreadContextProperties"</span>);
+    IDictionary dict = raw <span class="kw">as</span> IDictionary;
+    <span class="kw">if</span> (dict == <span class="kw">null</span>)
+    {
+        log.Warn(<span class="str">"LTC: слот пуст"</span>);
+    }
+    <span class="kw">else</span>
+    {
+        <span class="kw">foreach</span> (DictionaryEntry entry <span class="kw">in</span> dict)
+        {
+            <span class="kw">if</span> (entry.Value == <span class="kw">null</span>)
+                log.Error(<span class="str">"LTC GUILTY null key="</span> + entry.Key);
+            <span class="kw">else</span>
+                log.Info(<span class="str">"LTC ok key="</span> + entry.Key + <span class="str">" type="</span> + entry.Value.GetType().FullName);
+        }
+    }
+    <span class="com">// дальше remote-ответ</span>
+}</pre>
+<p>Ищите в логе <code class="inline">LTC GUILTY null key=...</code>. Нужны
+  <code class="inline">using System.Collections;</code> и
+  <code class="inline">using System.Runtime.Remoting.Messaging;</code>.</p>
+
+<h2>Почему падает log4net 2.0.9</h2>
+<p>Упрощённо GetObjectData (проверка null — <b>после</b> GetType):</p>
+<pre><span class="kw">foreach</span> (DictionaryEntry entry <span class="kw">in</span> InnerHashtable)
+{
+    <span class="kw">string</span> key = entry.Key <span class="kw">as</span> <span class="kw">string</span>;
+    <span class="kw">object</span> value = entry.Value;
+    <span class="kw">bool</span> serializable = value.GetType().IsSerializable; <span class="com">// NRE, если value == null</span>
+    <span class="kw">if</span> (key != <span class="kw">null</span> &amp;&amp; value != <span class="kw">null</span> &amp;&amp; serializable)
+        info.AddValue(key, value);
+}</pre>
+<div class="ok">
+  <b>Обход перед remoting:</b>
+  <code class="inline">CallContext.FreeNamedDataSlot("log4net.Util.LogicalThreadContextProperties");</code>
+  либо не писать в LogicalThreadContext значения, которые бывают null
+  (<code class="inline">if (ex.OrderId != null)</code>), либо <code class="inline">ThreadContext</code> вместо Logical
+  (он не уходит в CallContext).
+</div>
+
+<h2>Что не является этой ошибкой</h2>
+<ul>
+  <li>Разные версии log4net на клиенте/сервере (на ПРОМе они одинаковые)</li>
+  <li>SqlDependency (чужой пример с той же верхушкой стека)</li>
+  <li><code class="inline">long? OrderId</code> на exception без GetObjectData — поле просто не уедет</li>
+  <li><code class="inline">Properties = null</code> — так написать нельзя</li>
+</ul>
+
+<p class="footer">Файл собран из переписки по стенду Log4NetErrorRepro. Исходник HTML: docs/log4net-remoting-perepiska.html</p>
+</div>
+</body>
+</html>

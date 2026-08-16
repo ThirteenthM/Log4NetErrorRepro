@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>Log4NetErrorRepro.Contracts</RootNamespace>
+    <AssemblyName>Log4NetErrorRepro.Contracts</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Runtime.Remoting" />
+  </ItemGroup>
+</Project>
