@@ -11,16 +11,10 @@ namespace Log4NetErrorRepro.Server
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(ErrorService));
 
-        public override object InitializeLifetimeService()
-        {
-            return null;
-        }
+        public override object InitializeLifetimeService() => null;
 
-        public string Ping()
-        {
-            return "pong from " + typeof(ErrorService).Assembly.GetName().Name
+        public string Ping() => "pong from " + typeof(ErrorService).Assembly.GetName().Name
                 + ", log4net " + typeof(ILog).Assembly.GetName().Version;
-        }
 
         public RemoteResponse Execute(Scenario scenario)
         {
